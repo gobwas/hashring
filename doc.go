@@ -10,7 +10,7 @@ communication.
 For more theory about the subject please see this great document:
 https://theory.stanford.edu/~tim/s16/l/l1.pdf
 
-There is two goals for this hashring implementation:
+There are two goals for this hashring implementation:
 1) To be efficient in highly concurrent applications by blocking read
 operations for the least possible time.
 2) To correctly handle very rare but yet possible hash collisions, which may
