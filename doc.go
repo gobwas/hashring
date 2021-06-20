@@ -21,7 +21,9 @@ read operations (getting item for object) blocked only for a tiny amount of
 time needed to swap the ring's tree root after some write operation (insertion
 or deletion).
 
-The second goal is reached just by careful implementation and good tests
-coverage of possible collision cases.
+The second goal is reached by using ring of size 2^64-1 points, which
+dramatically reduces the probability of hash collisions (the greater the number
+of items on the ring, the higher the probability of collisions) and
+implementation that covers collisions.
 */
 package hashring

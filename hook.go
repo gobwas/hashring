@@ -1,6 +1,6 @@
 package hashring
 
-//go:generate gtrace -tag trace
+//go:generate gtrace -tag hashring_trace
 
 //gtrace:gen
 type traceRing struct {

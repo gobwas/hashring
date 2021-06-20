@@ -19,15 +19,15 @@ func ExampleRing() {
 	ring.Insert(StringItem("server03"), 1)
 	ring.Insert(StringItem("server04"), 1)
 
-	fmt.Println(ring.Get(StringItem("user01")))
-	fmt.Println(ring.Get(StringItem("user02")))
-	fmt.Println(ring.Get(StringItem("user03")))
-	fmt.Println(ring.Get(StringItem("user04")))
+	fmt.Println(ring.Get(StringItem("request00")))
+	fmt.Println(ring.Get(StringItem("request01")))
+	fmt.Println(ring.Get(StringItem("request02")))
+	fmt.Println(ring.Get(StringItem("request03")))
 
 	// Output:
 	// server04
+	// server03
 	// server04
-	// server02
 	// server01
 }
 
@@ -269,9 +269,9 @@ func TestRingDistribution(t *testing.T) {
 }
 
 func TestRingCollisions(t *testing.T) {
-	// Skip if no `-tags debug` was given.
+	// Skip if no `-tags hashring_debug` was given.
 	if !debug {
-		t.Skip("no debug buildtag")
+		t.Skip("no hashring_debug buildtag")
 	}
 
 	for _, test := range []struct {
@@ -280,7 +280,10 @@ func TestRingCollisions(t *testing.T) {
 		rings  [][]ringAction
 	}{
 		{
+			// Case when two items have one colliding point.
+			// Test that rings are equal in any order of item insertion.
 			name: "simple",
+
 			digest: map[digestArgs]uint64{
 				digestCall("bar", 0, 0):   42,
 				digestCall("foo", 0, 159): 42,
@@ -290,14 +293,72 @@ func TestRingCollisions(t *testing.T) {
 					insertItem("bar", 10),
 					insertItem("foo", 10),
 				},
+				{
+					insertItem("foo", 10),
+					insertItem("bar", 10),
+				},
 			},
 		},
 		{
-			// Case when foo and bar collide at value 42, and then, next
-			// generation of bar collides with some other foo's point value.
-			// After deletion of foo's 42 bar should be reset to initial
-			// generation.
+			// Case when two items have one colliding point.
+			// Test that rings are equal having different weight history.
+			name: "simple",
+
+			digest: map[digestArgs]uint64{
+				digestCall("bar", 0, 0):   42,
+				digestCall("foo", 0, 159): 42,
+			},
+			rings: [][]ringAction{
+				{
+					insertItem("bar", 10),
+					insertItem("foo", 1),
+					updateItem("foo", 10),
+					updateItem("foo", 1),
+				},
+				{
+					insertItem("bar", 10),
+					insertItem("foo", 1),
+				},
+			},
+		},
+		{
+			// Case when tree items have one colliding point.
+			// Test that ring had three items and then one removed is equal to
+			// a ring having two items.
+			name: "simple",
+
+			digest: map[digestArgs]uint64{
+				digestCall("foo", 0, 15): 42,
+				digestCall("bar", 0, 15): 42,
+				digestCall("baz", 0, 15): 42,
+			},
+			rings: [][]ringAction{
+				{
+					insertItem("foo", 1),
+					insertItem("baz", 1),
+					insertItem("bar", 1),
+					deleteItem("baz"),
+				},
+				{
+					insertItem("foo", 1),
+					insertItem("bar", 1),
+				},
+			},
+		},
+		{
+			// Case when `foo` and `bar` collide at value 42 (foo#159 and
+			// bar#0), and then, after getting next generation of both points,
+			// `bar` second generation starts to collide with `foo` first
+			// generation at value 99 (foo#1 and bar#0).
+			//
+			// After deletion of foo#159 having value 42 at its first
+			// generation (by decreasing presence of `foo` on a ring), bar#0
+			// should be reset to first generation.
+			//
+			// Test that ring described above is equal to a ring that initially
+			// has decreased presence of `foo`.
 			name: "two generations",
+
 			digest: map[digestArgs]uint64{
 				digestCall("foo", 0, 1):   99,
 				digestCall("foo", 0, 159): 42,
@@ -314,16 +375,30 @@ func TestRingCollisions(t *testing.T) {
 				{
 					insertItem("foo", 1),
 					insertItem("bar", 1),
-					updateItem("bar", 10), // Removes foo's 159 point due to weight change.
+					updateItem("bar", 1.1), // Removes foo's 159 point due to weight change.
 				},
 				{
-					insertItem("bar", 10),
+					insertItem("bar", 1.1),
 					insertItem("foo", 1),
 				},
 			},
 		},
 		{
-			name: "xxx",
+			// Case when `foo` and `bar` collide at value 1 (foo#0 and bar#0),
+			// and then, after getting next generation of both points, `bar`
+			// second generation starts to collide with `foo` first generation
+			// at value 2 (foo#159 and bar#0). After that, next generation is
+			// calculated for both points, and both start to collide at value 3
+			// (foo#159 and bar#0).
+			//
+			// After deletion of foo#159 having value 3 at its second
+			// generation and value 2 at first, bar#0 should be reset to the
+			// second generation.
+			//
+			// Test that ring described above is equal to a ring that initially
+			// has decreased presence of `foo`.
+			name: "three generations",
+
 			digest: map[digestArgs]uint64{
 				digestCall("foo", 0, 0):   1,
 				digestCall("foo", 0, 159): 2,
@@ -346,24 +421,7 @@ func TestRingCollisions(t *testing.T) {
 			},
 		},
 		{
-			digest: map[digestArgs]uint64{
-				digestCall("bar", 0, 0):   42,
-				digestCall("foo", 0, 159): 42,
-			},
-			rings: [][]ringAction{
-				{
-					insertItem("bar", 10),
-					insertItem("foo", 1),
-					updateItem("foo", 10),
-					updateItem("foo", 1),
-				},
-				{
-					insertItem("bar", 10),
-					insertItem("foo", 1),
-				},
-			},
-		},
-		{
+			name: "perm",
 			digest: map[digestArgs]uint64{
 				digestCall("foo", 0, 15): 42,
 				digestCall("bar", 0, 15): 42,
@@ -374,6 +432,7 @@ func TestRingCollisions(t *testing.T) {
 			),
 		},
 		{
+			name: "perm",
 			digest: map[digestArgs]uint64{
 				digestCall("foo", 0, 15): 42,
 				digestCall("bar", 0, 15): 42,
@@ -386,6 +445,7 @@ func TestRingCollisions(t *testing.T) {
 			),
 		},
 		{
+			name: "perm",
 			digest: map[digestArgs]uint64{
 				digestCall("foo", 0, 15): 42,
 				digestCall("bar", 0, 15): 42,
@@ -399,32 +459,12 @@ func TestRingCollisions(t *testing.T) {
 				insertItem("baq", 1),
 			),
 		},
-		{
-			digest: map[digestArgs]uint64{
-				digestCall("foo", 0, 15): 42,
-				digestCall("bar", 0, 15): 42,
-				digestCall("baz", 0, 15): 42,
-			},
-			rings: [][]ringAction{
-				{
-					insertItem("foo", 1),
-					insertItem("baz", 1),
-					insertItem("bar", 1),
-					deleteItem("baz"),
-				},
-				{
-					insertItem("foo", 1),
-					insertItem("bar", 1),
-				},
-			},
-		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			setupDigest(t, test.digest)
-
 			rings := make([]Ring, len(test.rings))
 			for i, actions := range test.rings {
 				fmt.Println(i, actions)
+				setupDigest(t, &rings[i], test.digest)
 				setupRingTrace(&rings[i])
 				applyActions(t, &rings[i], actions...)
 			}
@@ -468,8 +508,8 @@ func keyDistribution(r *Ring, fn func(Item, uint64)) {
 	)
 	r.root.InOrder(func(x avl.Item) bool {
 		p := x.(*point)
-		d := p.value - prev
-		prev = p.value
+		d := p.val - prev
+		prev = p.val
 		temp[p.bucket.id] += d
 		index[p.bucket.id] = p.bucket.item
 		return true
@@ -500,11 +540,13 @@ func assertDistribution(t testing.TB, act, exp map[string]float64, prec float64)
 	}
 }
 
+const mathMaxInt = int(^uint(0) >> 1) // math.MaxInt since Go 1.17.
+
 func getDistribution(t testing.TB, r *Ring, numGet int) map[string]float64 {
 	tmp := make(map[string]int)
 	act := make(map[string]float64)
 	for i := 0; i < numGet; i++ {
-		n := rand.Intn(maxInt)
+		n := rand.Intn(mathMaxInt)
 		item := r.Get(IntItem(n))
 		if item == nil {
 			t.Fatalf("unexpected empty item")
@@ -616,12 +658,12 @@ func assertRingsEqual(t *testing.T, spec string, r0, r1 *Ring) {
 	}
 	for i, p0 := range ps0 {
 		p1 := ps1[i]
-		if p0.value != p1.value {
+		if p0.val != p1.val {
 			t.Fatalf(
 				"%s: #%d-th point values are not equal: %d (%s) vs %d (%s)",
 				spec, i,
-				p0.value, p0.bucket.item,
-				p1.value, p1.bucket.item,
+				p0.val, p0.bucket.item,
+				p1.val, p1.bucket.item,
 			)
 		}
 		i0 := itemString(p0.bucket.item)
@@ -654,6 +696,6 @@ func (s StringItem) WriteTo(w io.Writer) (int64, error) {
 type IntItem int
 
 func (n IntItem) WriteTo(w io.Writer) (int64, error) {
-	m, err := w.Write(intSuffix(int(n)))
+	m, err := w.Write(encodeSuffix(int(n)))
 	return int64(m), err
 }

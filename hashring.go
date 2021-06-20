@@ -3,10 +3,12 @@ package hashring
 import (
 	"container/list"
 	"fmt"
+	"hash"
 	"io"
 	"math"
 	"sync"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/gobwas/avl"
 )
 
@@ -20,6 +22,12 @@ type Item interface {
 // It is goroutine safe. Ring instances must not be copied.
 // The zero value for Ring is an empty ring ready to use.
 type Ring struct {
+	// Hash is an optional function used to build up a new 64-bit hash function
+	// for further hash values calculation.
+	Hash func() hash.Hash64
+
+	hashPool sync.Pool
+
 	mu      sync.Mutex
 	buckets map[uint64]*bucket
 
@@ -46,7 +54,7 @@ func (r *Ring) Insert(x Item, w float64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	id := digest(x)
+	id := r.digest(x)
 	_, has := r.buckets[id]
 	if has {
 		return fmt.Errorf("hashring: item already exists")
@@ -78,10 +86,10 @@ func (r *Ring) Delete(x Item) error {
 	return r.update(x, 0)
 }
 
-// Get returns mapping for v.
+// Get returns mapping of v to previously inserted item.
 // Returned item is nil only when ring is empty.
 func (r *Ring) Get(v Item) Item {
-	d := digest(v)
+	d := r.digest(v)
 
 	r.ring.RLock()
 	item := r.root.Successor(search(d))
@@ -96,11 +104,34 @@ func (r *Ring) Get(v Item) Item {
 	return item.(*point).bucket.item
 }
 
+func (r *Ring) digest(src io.WriterTo, suffix ...byte) uint64 {
+	h, _ := r.hashPool.Get().(hash.Hash64)
+	if h == nil {
+		if r.Hash != nil {
+			h = r.Hash()
+		} else {
+			h = xxhash.New()
+		}
+	}
+	defer func() {
+		h.Reset()
+		r.hashPool.Put(h)
+	}()
+	_, err := src.WriteTo(h)
+	if err == nil {
+		_, err = h.Write(suffix)
+	}
+	if err != nil {
+		panic(fmt.Sprintf("hashring: digest error: %v", err))
+	}
+	return h.Sum64()
+}
+
 func (r *Ring) update(x Item, w float64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	id := digest(x)
+	id := r.digest(x)
 	b, has := r.buckets[id]
 	if !has {
 		return fmt.Errorf("hashring: item doesn't exist")
@@ -146,9 +177,9 @@ func (r *Ring) insertPoint(tree avl.Tree, p *point) (_ avl.Tree, inserted bool) 
 		trace.onDone(inserted)
 	}()
 
-	if c := r.collisions[p.value]; c.Size() != 0 {
+	if c := r.collisions[p.value()]; c.Size() != 0 {
 		r.trace.onFixNeeded(p)
-		r.collisions[p.value] = mustInsertTree(c, collision{p})
+		r.collisions[p.value()] = mustInsertTree(c, collision{p})
 		r.fix.PushBack(p)
 		return tree, false
 	}
@@ -167,10 +198,10 @@ func (r *Ring) insertPoint(tree avl.Tree, p *point) (_ avl.Tree, inserted bool) 
 	if r.collisions == nil {
 		r.collisions = make(map[uint64]avl.Tree)
 	}
-	c := r.collisions[p.value]
+	c := r.collisions[p.value()]
 	c = mustInsertTree(c, collision{p})
 	c = mustInsertTree(c, collision{d})
-	r.collisions[p.value] = c
+	r.collisions[p.value()] = c
 
 	assertNotExists(tree, d)
 	assertNotExists(tree, p)
@@ -201,9 +232,9 @@ func (r *Ring) deletePoint(tree avl.Tree, p *point) (_ avl.Tree, removed bool) {
 		done := trace.onProcessing(p)
 		for p.generation() > 0 {
 			// Rollback one generation back.
-			p.backward()
+			p.rewind()
 
-			c, has := r.collisions[p.value]
+			c, has := r.collisions[p.value()]
 			if !has {
 				// We are processing twin here, and collisions were removed
 				// already.
@@ -213,10 +244,10 @@ func (r *Ring) deletePoint(tree avl.Tree, p *point) (_ avl.Tree, removed bool) {
 			if c.Size() > 1 {
 				// There are more than one twins remaining, so don't cleanup
 				// them yet.
-				r.collisions[p.value] = c
+				r.collisions[p.value()] = c
 				continue
 			}
-			delete(r.collisions, p.value)
+			delete(r.collisions, p.value())
 
 			twin := c.Min().(collision).point
 			trace.onTwinDelete(twin)
@@ -269,7 +300,7 @@ func (r *Ring) rebuild() {
 				root, _ = r.deletePoint(root, p)
 			}
 			for i := len(b.points); i < size; i++ {
-				v := digest(b.item, intSuffix(0, i)...)
+				v := r.digest(b.item, encodeSuffix(0, i)...)
 				p := newPoint(b, i, v)
 				b.points = append(b.points, p)
 				root, _ = r.insertPoint(root, p)
@@ -284,8 +315,9 @@ func (r *Ring) rebuild() {
 			trace := r.trace.onFix(p)
 			assertNotExists(root, p)
 
-			v := digest(p.bucket.item, intSuffix(p.generation()+1, p.index)...)
-			p.pushValue(v)
+			g := p.generation()
+			v := r.digest(p.bucket.item, encodeSuffix(g+1, p.index)...)
+			p.proceed(v)
 			root, _ = r.insertPoint(root, p)
 
 			trace.onDone()

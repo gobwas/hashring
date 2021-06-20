@@ -1,4 +1,4 @@
-// +build !debug
+// +build !hashring_debug
 
 package hashring
 
@@ -11,7 +11,7 @@ import (
 const debug = false
 
 func setupDigestHook(fn func(io.WriterTo, ...byte) uint64) func() {
-	panic("setupDigestHook() can only be called with `debug` buildtag")
+	panic("setupDigestHook() can only be called with `hashring_debug` buildtag")
 }
 
 func assertNotExists(avl.Tree, *point) {}

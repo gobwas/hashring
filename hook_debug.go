@@ -1,10 +1,9 @@
-// +build debug
+// +build hashring_debug
 
 package hashring
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"strings"
 
@@ -12,14 +11,6 @@ import (
 )
 
 const debug = true
-
-func setupDigestHook(fn func(io.WriterTo, ...byte) uint64) func() {
-	prev := digestTestHook
-	digestTestHook = fn
-	return func() {
-		digestTestHook = prev
-	}
-}
 
 func assertNotExists(tree avl.Tree, p *point) {
 	if x := tree.Search(p); x != nil && x.(*point) == p {
@@ -111,6 +102,6 @@ func setupRingTrace(r *Ring) {
 func pointInfo(p *point) string {
 	return fmt.Sprintf(
 		"%p: %s[%d] %v %d",
-		p, p.bucket.item, p.index, p.stack, p.value,
+		p, p.bucket.item, p.index, p.stack, p.val,
 	)
 }
