@@ -26,4 +26,4 @@ jobs:
 
     - name: Test
       run: |
-        go test -v -cover -tags debug,trace ./...
+        make test
