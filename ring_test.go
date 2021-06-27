@@ -79,8 +79,9 @@ func TestRingConcurrency(t *testing.T) {
 			}
 			for i := 0; i < test.numWriter; i++ {
 				go func(base int) {
-					for i := 0; i < 1000; i++ {
-						item := IntItem(base*1000 + i)
+					const numItem = 100
+					for i := 0; i < numItem; i++ {
+						item := IntItem(base*numItem + i)
 						err := r.Insert(item, 1)
 						if err != nil {
 							writerDone <- fmt.Errorf("can't insert element: %v", err)
