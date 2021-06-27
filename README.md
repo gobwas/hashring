@@ -73,9 +73,28 @@ func (s StringItem) WriteTo(w io.Writer) (int64, error) {
 }
 ```
 
+# Contribution
+
+If you found some bug or want to improve this package in any other way feel
+free to file an issue or open a PR.
+
+## Debugging
+
+Note that this package comes with built in _debug_ tracing (which only takes
+place if you pass `hashring_trace` build tag, thanks to [gtrace][gtrace]
+zero-cost tracing).
+
+This means that you can make hashring to print out each meaningful step it does
+to understand better what's happening under the hood.
+
+It also consumes `hashring_debug` build tag, which allows you to hook into hash
+calculation process and override the value it returns. For example, this was
+useful to test hash collisions.
+
 
 [godoc-image]:  https://godoc.org/github.com/gobwas/hashring?status.svg
 [godoc-url]:    https://godoc.org/github.com/gobwas/hashring
 [ci-badge]:     https://github.com/gobwas/hashring/actions/workflows/main.yml/badge.svg?branch=main
 [ci-url]:       https://github.com/gobwas/hashring/actions/workflows/main.yml
 [stanford-doc]: https://theory.stanford.edu/~tim/s16/l/l1.pdf
+[gtrace]:       https://github.com/gobwas/gtrace
