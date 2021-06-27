@@ -73,10 +73,11 @@ func (s StringItem) WriteTo(w io.Writer) (int64, error) {
 }
 ```
 
-# Contribution
+# Contributing
 
-If you found some bug or want to improve this package in any other way feel
-free to file an issue or open a PR.
+If you found some bug or want to improve this package in any way feel free to
+file an issue to discuss your findings and then, if you wish, open a PR
+containing discussed changes.
 
 ## Debugging
 
