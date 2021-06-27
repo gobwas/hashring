@@ -26,4 +26,4 @@ jobs:
 
     - name: Test
       run: |
-        make test
+        go test . -v -race -tags hashring_debug,hashring_trace

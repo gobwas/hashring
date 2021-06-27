@@ -14,7 +14,8 @@ generate: hook_gtrace.go
 
 .PHONY: test
 test: gtrace hook_gtrace.go
-	go test . -v -race -tags hashring_debug,hashring_trace
+	# NOTE: if you change this update also .github/workflows/main.yml/Test
+	go test . -v -race -tags hashring_debug
 
 .PHONY: clean
 clean:
