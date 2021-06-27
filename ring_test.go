@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gobwas/avl"
 )
@@ -40,6 +41,68 @@ func ExampleRing() {
 	// 253479
 	// 246126
 	// 246155
+}
+
+func TestRingConcurrency(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		numReader int
+		numWriter int
+	}{
+		{
+			numReader: 2,
+			numWriter: 1,
+		},
+		{
+			numReader: 1,
+			numWriter: 2,
+		},
+	} {
+		name := fmt.Sprintf("%dr-%dw", test.numReader, test.numWriter)
+		t.Run(name, func(t *testing.T) {
+			var (
+				r          Ring
+				readerDone = make(chan error)
+				writerDone = make(chan error)
+			)
+			for i := 0; i < test.numReader; i++ {
+				go func() {
+					for {
+						select {
+						case readerDone <- nil:
+							return
+						default:
+							r.Get(IntItem(rand.Intn(1000000)))
+						}
+					}
+				}()
+			}
+			for i := 0; i < test.numWriter; i++ {
+				go func(base int) {
+					for i := 0; i < 1000; i++ {
+						item := IntItem(base*1000 + i)
+						err := r.Insert(item, 1)
+						if err != nil {
+							writerDone <- fmt.Errorf("can't insert element: %v", err)
+							return
+						}
+						time.Sleep(time.Millisecond)
+					}
+					writerDone <- nil
+				}(i)
+			}
+			for i := 0; i < test.numWriter; i++ {
+				if err := <-writerDone; err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i := 0; i < test.numReader; i++ {
+				if err := <-readerDone; err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
 }
 
 type distCase struct {
