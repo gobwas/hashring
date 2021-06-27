@@ -32,7 +32,7 @@ type Ring struct {
 	//
 	// For many implementations (ketama.c for example) this number is 160.
 	// However, since we are using 64-bit ring we have to add more virtual
-	// points to get more equal distribution.
+	// points to get more or less the same distribution.
 	//
 	// This is the maximum number of points can be placed on ring for a single
 	// item. That is, item having max weight will have this amount of points.
@@ -41,26 +41,46 @@ type Ring struct {
 	// applications the default value is fine enough.
 	MagicFactor int
 
+	// hashPool is a pool of reusable hash functions.
 	hashPool sync.Pool
 
-	// mu is a write-only opearations mutex.
+	// mu serializes write-only opearations on the ring.
 	// It should be held when doing insert/update/delete operations, which in
-	// turn lead to rebuild the ring.
+	// turn lead to ring rebuild.
 	mu sync.Mutex
 
 	// buckets is a mapping of a non-suffixed digest of an item to a bucket.
 	// It is protected by r.mu mutex.
 	buckets map[uint64]*bucket
 
-	ringMu sync.RWMutex
-	ring   avl.Tree
-
 	// collisions is a mapping of collided point value to a tree of all points
-	// having same value somewhere in theirs generations.
+	// having same value in their generations.
+	// It is protected by r.mu mutex.
 	collisions map[uint64]avl.Tree // tree<collision>
-	fix        list.List           // list<*point>
-	minWeight  float64
-	maxWeight  float64
+
+	// fix is a list of points required to be fixed.
+	// It's filled only during ring mutation and drained in the end of it.
+	// It is protected by r.mu mutex.
+	fix list.List // list<*point>
+
+	// minWeight holds minimum weight of item on the ring.
+	// It is protected by r.mu mutex.
+	minWeight float64
+	// maxWeight holds maximume weight of item on the ring.
+	// It is protected by r.mu mutex.
+	maxWeight float64
+
+	// ringMu serializes read & write operations on the tree holding bucket
+	// points.
+	// It's read-end should be held when reading the tree data.
+	// It's write-end should be held when tree pointer is being updated.
+	ringMu sync.RWMutex
+
+	// ring is a tree holding bucket points.
+	// It's protected by r.mu and r.ringMu mutex.
+	// Note that r.mu mutex should be held while preparing new (mutated)
+	// version of the tree.
+	ring avl.Tree // tree<*point>
 
 	trace traceRing
 }
@@ -195,6 +215,7 @@ func (r *Ring) changeWeight(prev, next float64) {
 	}
 }
 
+// r.mu must be held.
 func (r *Ring) insertPoint(tree avl.Tree, p *point) (_ avl.Tree, inserted bool) {
 	trace := r.trace.onInsert(p)
 	defer func() {
@@ -237,6 +258,7 @@ func (r *Ring) insertPoint(tree avl.Tree, p *point) (_ avl.Tree, inserted bool) 
 	return tree, false
 }
 
+// r.mu must be held.
 func (r *Ring) deletePoint(tree avl.Tree, p *point) (_ avl.Tree, removed bool) {
 	trace := r.trace.onDelete(p)
 	defer func() {
