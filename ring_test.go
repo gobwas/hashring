@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -14,21 +15,31 @@ import (
 
 func ExampleRing() {
 	var ring Ring
+
+	// Insert four servers on the ring with equal weight.
 	ring.Insert(StringItem("server01"), 1)
 	ring.Insert(StringItem("server02"), 1)
 	ring.Insert(StringItem("server03"), 1)
 	ring.Insert(StringItem("server04"), 1)
 
-	fmt.Println(ring.Get(StringItem("request00")))
-	fmt.Println(ring.Get(StringItem("request01")))
-	fmt.Println(ring.Get(StringItem("request02")))
-	fmt.Println(ring.Get(StringItem("request03")))
+	// Calculate distribution of 1M requests across four servers.
+	distribution := make(map[string]int)
+	for i := 0; i < 1000000; i++ {
+		x := ring.Get(StringItem(strconv.Itoa(i)))
+		s := string(x.(StringItem))
+		distribution[s]++
+	}
+
+	fmt.Println(distribution["server01"])
+	fmt.Println(distribution["server02"])
+	fmt.Println(distribution["server03"])
+	fmt.Println(distribution["server04"])
 
 	// Output:
-	// server04
-	// server03
-	// server04
-	// server01
+	// 254240
+	// 253479
+	// 246126
+	// 246155
 }
 
 type distCase struct {
@@ -259,9 +270,8 @@ func TestRingDistribution(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := makeRing(t, test.ring, test.actions...)
 			act := make(map[string]float64)
-			keyDistribution(r, func(x Item, v uint64) {
-				d := float64(v) / float64(math.MaxUint64) * 100
-				act[string(x.(StringItem))] = d
+			keyDistribution(r, func(x Item, d float64) {
+				act[string(x.(StringItem))] = d * 100
 			})
 			assertDistribution(t, act, test.dist, test.prec)
 		})
@@ -497,19 +507,20 @@ func makeRing(t testing.TB, keys map[string]float64, actions ...ringAction) *Rin
 	return &r
 }
 
-func keyDistribution(r *Ring, fn func(Item, uint64)) {
-	r.ring.RLock()
-	defer r.ring.RUnlock()
+func keyDistribution(r *Ring, fn func(Item, float64)) {
+	r.ringMu.RLock()
+	defer r.ringMu.RUnlock()
 	var (
-		prev uint64
+		prev float64
 
-		temp  = map[uint64]uint64{}
+		temp  = map[uint64]float64{}
 		index = map[uint64]Item{}
 	)
-	r.root.InOrder(func(x avl.Item) bool {
+	r.ring.InOrder(func(x avl.Item) bool {
 		p := x.(*point)
-		d := p.val - prev
-		prev = p.val
+		v := float64(p.val)
+		d := v - prev
+		prev = v
 		temp[p.bucket.id] += d
 		index[p.bucket.id] = p.bucket.item
 		return true
@@ -517,12 +528,12 @@ func keyDistribution(r *Ring, fn func(Item, uint64)) {
 
 	// All objects greater than r.root.Max() (prev hash value) falls into
 	// r.root.Min() bucket.
-	min := r.root.Min().(*point).bucket.id
+	min := r.ring.Min().(*point).bucket.id
 	temp[min] += math.MaxUint64 - prev
 
 	for id, dist := range temp {
 		item := index[id]
-		fn(item, dist)
+		fn(item, dist/float64(math.MaxUint64))
 	}
 }
 
@@ -643,7 +654,7 @@ func (d deleteRingAction) apply(r *Ring) error {
 }
 
 func ringPoints(r *Ring) (ps []*point) {
-	r.root.InOrder(func(x avl.Item) bool {
+	r.ring.InOrder(func(x avl.Item) bool {
 		ps = append(ps, x.(*point))
 		return true
 	})

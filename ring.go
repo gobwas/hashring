@@ -12,7 +12,7 @@ import (
 	"github.com/gobwas/avl"
 )
 
-const magicFactor = 160
+const DefaultMagicFactor = 1020
 
 type Item interface {
 	io.WriterTo
@@ -26,13 +26,34 @@ type Ring struct {
 	// for further hash values calculation.
 	Hash func() hash.Hash64
 
+	// MagicFactor is an optional number of "virtual" points on the ring per
+	// item. The higher this number, the more equal distribution of objects
+	// this ring produces and the more time is needed to update the ring.
+	//
+	// For many implementations (ketama.c for example) this number is 160.
+	// However, since we are using 64-bit ring we have to add more virtual
+	// points to get more equal distribution.
+	//
+	// This is the maximum number of points can be placed on ring for a single
+	// item. That is, item having max weight will have this amount of points.
+	//
+	// If MagicFactor is zero, then the DefaultMagicFactor is used. For most
+	// applications the default value is fine enough.
+	MagicFactor int
+
 	hashPool sync.Pool
 
-	mu      sync.Mutex
+	// mu is a write-only opearations mutex.
+	// It should be held when doing insert/update/delete operations, which in
+	// turn lead to rebuild the ring.
+	mu sync.Mutex
+
+	// buckets is a mapping of a non-suffixed digest of an item to a bucket.
+	// It is protected by r.mu mutex.
 	buckets map[uint64]*bucket
 
-	ring sync.RWMutex
-	root avl.Tree
+	ringMu sync.RWMutex
+	ring   avl.Tree
 
 	// collisions is a mapping of collided point value to a tree of all points
 	// having same value somewhere in theirs generations.
@@ -91,12 +112,12 @@ func (r *Ring) Delete(x Item) error {
 func (r *Ring) Get(v Item) Item {
 	d := r.digest(v)
 
-	r.ring.RLock()
-	item := r.root.Successor(search(d))
+	r.ringMu.RLock()
+	item := r.ring.Successor(search(d))
 	if item == nil {
-		item = r.root.Min()
+		item = r.ring.Min()
 	}
-	r.ring.RUnlock()
+	r.ringMu.RUnlock()
 
 	if item == nil {
 		return nil
@@ -117,6 +138,8 @@ func (r *Ring) digest(src io.WriterTo, suffix ...byte) uint64 {
 		h.Reset()
 		r.hashPool.Put(h)
 	}()
+
+	// FIXME: panic(h.BlockSize())
 	_, err := src.WriteTo(h)
 	if err == nil {
 		_, err = h.Write(suffix)
@@ -128,10 +151,11 @@ func (r *Ring) digest(src io.WriterTo, suffix ...byte) uint64 {
 }
 
 func (r *Ring) update(x Item, w float64) error {
+	id := r.digest(x)
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	id := r.digest(x)
 	b, has := r.buckets[id]
 	if !has {
 		return fmt.Errorf("hashring: item doesn't exist")
@@ -277,16 +301,23 @@ func (r *Ring) deletePoint(tree avl.Tree, p *point) (_ avl.Tree, removed bool) {
 	return tree, true
 }
 
+func (r *Ring) magicFactor() int {
+	if m := r.MagicFactor; m > 0 {
+		return m
+	}
+	return DefaultMagicFactor
+}
+
 // r.mu must be held.
 func (r *Ring) rebuild() {
 	numPoints := line(
-		r.maxWeight, magicFactor,
-		r.minWeight, math.Ceil(magicFactor*(r.minWeight/r.maxWeight)),
+		r.maxWeight, float64(r.magicFactor()),
+		r.minWeight, math.Ceil(float64(r.magicFactor())*(r.minWeight/r.maxWeight)),
 	)
 
-	r.ring.RLock()
-	root := r.root
-	r.ring.RUnlock()
+	r.ringMu.RLock()
+	root := r.ring
+	r.ringMu.RUnlock()
 
 	for {
 		for id, b := range r.buckets {
@@ -327,9 +358,9 @@ func (r *Ring) rebuild() {
 		}
 	}
 
-	r.ring.Lock()
-	r.root = root
-	r.ring.Unlock()
+	r.ringMu.Lock()
+	r.ring = root
+	r.ringMu.Unlock()
 }
 
 func line(x0, y0, x1, y1 float64) func(float64) int {

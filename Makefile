@@ -1,4 +1,5 @@
 sources:=$(filter-out %_test.go,$(wildcard *.go))
+sources:=$(filter-out %_gtrace.go,$(sources))
 
 gtrace: go.mod go.sum
 	go get github.com/gobwas/gtrace@v0.4.3

@@ -99,31 +99,32 @@ func xxDigest(p []byte) uint64 {
 	return h.Sum64()
 }
 
-func splitSuffix(bts []byte) (_ []byte, xs []int) {
-	i := bytes.Index(bts, magic)
-	if i == -1 {
+// splitSuffix splits given bytes slice by the item bytes and its suffix,
+// produced by a ring.
+//
+// NOTE: it's assumed that item bytes are no longer than 2*intSize (intSize is
+// 4 or 8 bytes depending on arch).
+func splitSuffix(bts []byte) (item []byte, ints []int) {
+	n := len(bts)
+	s := 2 * intSize
+	if n <= s {
+		// No suffix added.
 		return bts, nil
 	}
-
-	ret := bts[:i]
-	suf := bts[i+intSize:]
-
-	xs = make([]int, len(suf)/intSize)
-	if len(xs) != 2 {
-		panic(fmt.Sprintf(
-			"unexpected size of hash suffix: %d (%#q)",
-			len(xs), bts,
-		))
+	suf := bts[n-s:]
+	return bts[:s], []int{
+		decodeInt(suf[0*intSize:]),
+		decodeInt(suf[1*intSize:]),
 	}
-	for i, j := intSize, 0; i <= len(suf); i, j = i+intSize, j+1 {
-		src := suf[i-intSize : i]
-		switch intSize {
-		case 4:
-			xs[j] = int(binary.LittleEndian.Uint32(src))
-		case 8:
-			xs[j] = int(binary.LittleEndian.Uint64(src))
-		}
-	}
+}
 
-	return ret, xs
+func decodeInt(src []byte) int {
+	switch intSize {
+	case 4:
+		return int(binary.LittleEndian.Uint32(src))
+	case 8:
+		return int(binary.LittleEndian.Uint64(src))
+	default:
+		panic("unexpected int size")
+	}
 }
