@@ -142,31 +142,6 @@ func (r *Ring) Get(v Item) Item {
 	return item.(*point).bucket.item
 }
 
-func (r *Ring) digest(src io.WriterTo, suffix ...byte) uint64 {
-	h, _ := r.hashPool.Get().(hash.Hash64)
-	if h == nil {
-		if r.Hash != nil {
-			h = r.Hash()
-		} else {
-			h = xxhash.New()
-		}
-	}
-	defer func() {
-		h.Reset()
-		r.hashPool.Put(h)
-	}()
-
-	// FIXME: panic(h.BlockSize())
-	_, err := src.WriteTo(h)
-	if err == nil {
-		_, err = h.Write(suffix)
-	}
-	if err != nil {
-		panic(fmt.Sprintf("hashring: digest error: %v", err))
-	}
-	return h.Sum64()
-}
-
 func (r *Ring) update(x Item, w float64) error {
 	id := r.digest(x)
 
@@ -188,16 +163,6 @@ func (r *Ring) update(x Item, w float64) error {
 }
 
 // r.mu must be held.
-func (r *Ring) updateWeight(w float64) {
-	if r.minWeight == 0 || w < r.minWeight {
-		r.minWeight = w
-	}
-	if r.maxWeight == 0 || w > r.maxWeight {
-		r.maxWeight = w
-	}
-}
-
-// r.mu must be held.
 func (r *Ring) changeWeight(prev, next float64) {
 	if prev != r.minWeight && prev != r.maxWeight {
 		r.updateWeight(next)
@@ -210,6 +175,40 @@ func (r *Ring) changeWeight(prev, next float64) {
 			r.updateWeight(b.weight)
 		}
 	}
+}
+
+// r.mu must be held.
+func (r *Ring) updateWeight(w float64) {
+	if r.minWeight == 0 || w < r.minWeight {
+		r.minWeight = w
+	}
+	if r.maxWeight == 0 || w > r.maxWeight {
+		r.maxWeight = w
+	}
+}
+
+func (r *Ring) digest(src io.WriterTo, suffix ...byte) uint64 {
+	h, _ := r.hashPool.Get().(hash.Hash64)
+	if h == nil {
+		if r.Hash != nil {
+			h = r.Hash()
+		} else {
+			h = xxhash.New()
+		}
+	}
+	defer func() {
+		h.Reset()
+		r.hashPool.Put(h)
+	}()
+
+	_, err := src.WriteTo(h)
+	if err == nil {
+		_, err = h.Write(suffix)
+	}
+	if err != nil {
+		panic(fmt.Sprintf("hashring: digest error: %v", err))
+	}
+	return h.Sum64()
 }
 
 // r.mu must be held.
