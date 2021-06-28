@@ -30,12 +30,9 @@ type Ring struct {
 	// item. The higher this number, the more equal distribution of objects
 	// this ring produces and the more time is needed to update the ring.
 	//
-	// For many implementations (ketama.c for example) this number is 160.
-	// However, since we are using 64-bit ring we have to add more virtual
-	// points to get more or less the same distribution.
-	//
-	// This is the maximum number of points can be placed on ring for a single
-	// item. That is, item having max weight will have this amount of points.
+	// MagicFactor is the maximum number of points which can be placed on ring
+	// for a single item. That is, item having max weight will have this amount
+	// of points.
 	//
 	// If MagicFactor is zero, then the DefaultMagicFactor is used. For most
 	// applications the default value is fine enough.
