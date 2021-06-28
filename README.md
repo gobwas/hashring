@@ -32,7 +32,7 @@ something good.
 The key points of the package:
 1) Efficient concurrent read operations
 2) Correct handling of write operations (order of insertions on different
-processes doesn't matter; hash collisions are handled properly).
+processes doesn't matter; hash collisions are handled carefully).
 
 # Installation
 
@@ -75,9 +75,8 @@ func (s StringItem) WriteTo(w io.Writer) (int64, error) {
 
 # Contributing
 
-If you found some bug or want to improve this package in any way feel free to
-file an issue to discuss your findings and then, if you wish, open a PR
-containing discussed changes.
+If you find some bug or want to improve this package in any way feel free to
+file an issue to discuss your findings or ideas.
 
 ## Debugging
 
