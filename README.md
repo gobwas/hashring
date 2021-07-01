@@ -91,6 +91,21 @@ It also consumes `hashring_debug` build tag, which allows you to hook into hash
 calculation process and override the value it returns. For example, this was
 useful to test hash collisions.
 
+## Magic factor
+
+Magic factor is a number of "virtual" nodes each item gets on a ring. The
+higher this number, the more equal distribution of objects this ring produces
+and the more time is needed to update the ring.
+
+The default value is picked through testing different sets of servers and
+objects, however, for some datasets it may be enough to have smaller (or
+higher) value of magic factor. There is a branch called [magic][magic] which
+contains code used to generate statistics on distribution of objects depending
+on magic factor value.
+
+Here is the sample result of distribution of 10M objects across 10 servers with
+different magic factor values:
+<img alt="Magic factor plot" src="https://github.com/gobwas/hashring/blob/magic/magicfactor.png" width="512">
 
 [godoc-image]:  https://godoc.org/github.com/gobwas/hashring?status.svg
 [godoc-url]:    https://godoc.org/github.com/gobwas/hashring
@@ -98,3 +113,5 @@ useful to test hash collisions.
 [ci-url]:       https://github.com/gobwas/hashring/actions/workflows/main.yml
 [stanford-doc]: https://theory.stanford.edu/~tim/s16/l/l1.pdf
 [gtrace]:       https://github.com/gobwas/gtrace
+[magic]:        https://github.com/gobwas/hashring/tree/magic
+[magic-image]:  https://github.com/gobwas/hashring/blob/magic/magicfactor.png
