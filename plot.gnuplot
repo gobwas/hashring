@@ -1,5 +1,5 @@
 set title 'hashring magic factor selection'
-set terminal png size 1024,768
+set terminal png size 1600,1200 enhanced font 'Verdana,20'
 set grid
 set xtics (150, 1000, 2000, 3000, 5000, 7000)
 set xlabel 'magic factor'
