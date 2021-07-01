@@ -105,7 +105,7 @@ on magic factor value.
 
 Here is the sample result of distribution of 10M objects across 10 servers with
 different magic factor values:
-<img alt="Magic factor plot" src="https://github.com/gobwas/hashring/blob/magic/magicfactor.png" width="512">
+<img alt="Magic factor plot" src="https://github.com/gobwas/hashring/blob/magic/magicfactor.png" width="800">
 
 [godoc-image]:  https://godoc.org/github.com/gobwas/hashring?status.svg
 [godoc-url]:    https://godoc.org/github.com/gobwas/hashring
