@@ -1,4 +1,4 @@
 github.com/cespare/xxhash/v2 v2.1.1 h1:6MnRN8NT7+YBpUIWxHtefFZOKTAPgGjpQSxqLNn0+qY=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
-github.com/gobwas/avl v0.1.1 h1:tAtklFa+85gNSmF4r4Q0DKd7eA5c7e+ZsiZbQrUBBns=
-github.com/gobwas/avl v0.1.1/go.mod h1:neVstOcTQ/HtFQZsBZlejOtalADU66OtirPXWrv8BCo=
+github.com/gobwas/avl v0.2.1 h1:OouPC2xX+YJP68utNzt2d/HYXanS6NscqSRf/F+cNIw=
+github.com/gobwas/avl v0.2.1/go.mod h1:neVstOcTQ/HtFQZsBZlejOtalADU66OtirPXWrv8BCo=
