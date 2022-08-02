@@ -63,7 +63,7 @@ type Ring struct {
 	// minWeight holds minimum weight of item on the ring.
 	// It is protected by r.mu mutex.
 	minWeight float64
-	// maxWeight holds maximume weight of item on the ring.
+	// maxWeight holds maximum weight of item on the ring.
 	// It is protected by r.mu mutex.
 	maxWeight float64
 
