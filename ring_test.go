@@ -551,6 +551,30 @@ func TestRingCollisions(t *testing.T) {
 	}
 }
 
+func TestRingHas(t *testing.T) {
+	var ring Ring
+
+	if ring.Has(StringItem("server01")) {
+		t.Error("has server on empty ring")
+	}
+
+	ring.Insert(StringItem("server01"), 1.0)
+	if !ring.Has(StringItem("server01")) {
+		t.Error("failed to find server")
+	}
+	if ring.Has(StringItem("key")) {
+		t.Error("ring has not inserted key")
+	}
+
+	ring.Insert(StringItem("key"), 1.0)
+	if !ring.Has(StringItem("server01")) {
+		t.Error("failed to find server")
+	}
+	if !ring.Has(StringItem("key")) {
+		t.Error("failed to find key")
+	}
+}
+
 func applyActions(t testing.TB, r *Ring, actions ...ringAction) {
 	for _, a := range actions {
 		if err := a.apply(r); err != nil {
