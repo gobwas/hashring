@@ -3,8 +3,8 @@ package hashring
 import "github.com/gobwas/avl"
 
 // point represents a point on the ring.
-// To handle collisions properly it may change it's value to another one,
-// increasing it's generation by one.
+// To handle collisions properly it may change its value to another one,
+// increasing its generation by one.
 type point struct {
 	// bucket is a bucket where point belongs to.
 	bucket *bucket
