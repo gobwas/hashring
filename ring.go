@@ -142,6 +142,16 @@ func (r *Ring) Get(v Item) Item {
 	return item.(*point).bucket.item
 }
 
+func (r *Ring) Has(x Item) bool {
+	d := r.digest(x)
+
+	r.ringMu.RLock()
+	defer r.ringMu.RUnlock()
+
+	_, has := r.buckets[d]
+	return has
+}
+
 func (r *Ring) update(x Item, w float64) error {
 	id := r.digest(x)
 
