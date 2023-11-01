@@ -1,3 +1,4 @@
+//go:build hashring_debug
 // +build hashring_debug
 
 package hashring
