@@ -321,6 +321,29 @@ func TestRingDeleteNotExisting(t *testing.T) {
 	}
 }
 
+func TestRingInsertDeleteSequence(t *testing.T) {
+	var r Ring
+	x := StringItem("foo")
+	if err := r.Insert(x, 1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := r.Delete(x); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if item := r.Get(x); item != nil {
+		t.Fatalf("unexpected item from empty ring")
+	}
+	if err := r.Insert(x, 1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if item := r.Get(x); item == nil {
+		t.Fatalf("want item, but return empty")
+	}
+	if err := r.Delete(x); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRingUpdateNotExisting(t *testing.T) {
 	var r Ring
 	x := StringItem("foo")
