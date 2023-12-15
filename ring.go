@@ -329,19 +329,27 @@ func (r *Ring) deletePoint(tree avl.Tree, p *point) (_ avl.Tree, removed bool) {
 	return tree, true
 }
 
-func (r *Ring) magicFactor() int {
+func (r *Ring) magicFactor() float64 {
 	if m := r.MagicFactor; m > 0 {
-		return m
+		return float64(m)
 	}
 	return DefaultMagicFactor
 }
 
 // r.mu must be held.
-func (r *Ring) rebuild() {
-	numPoints := line(
-		r.maxWeight, float64(r.magicFactor()),
-		r.minWeight, math.Ceil(float64(r.magicFactor())*(r.minWeight/r.maxWeight)),
+func (r *Ring) numPoints() func(float64) int {
+	if r.maxWeight == 0 {
+		return func(float64) int { return 0 }
+	}
+	return line(
+		r.maxWeight, r.magicFactor(),
+		r.minWeight, math.Ceil(r.magicFactor())*(r.minWeight/r.maxWeight),
 	)
+}
+
+// r.mu must be held.
+func (r *Ring) rebuild() {
+	numPoints := r.numPoints()
 
 	r.ringMu.RLock()
 	root := r.ring
